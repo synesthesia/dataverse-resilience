@@ -20,3 +20,5 @@ see [Register an app with Azure Active Directory](https://learn.microsoft.com/en
     make a note of the client ID and client secret
 - if you want to run the samples in ClientSecret mode, [create an S2S user]()
 in your Dataverse environment the ClientId of your registered app, grant that user sufficient security permissions
+- select "Manage User Secrets" in Visual studio, or in the project directory run `dotnet user-secrets init`
+- copy the attributes needed for User Secrets from `appsettings.json` and add values from your own configuration
