@@ -1,5 +1,5 @@
-﻿using DVConsole.HostedServices;
-using DVConsole.Services;
+﻿using DVConsole.Configuration;
+using DVConsole.HostedServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -13,13 +13,14 @@ namespace DVConsole
         {
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
                 .WriteTo.Console()
                 .CreateLogger();
             try
             {
-                await CreateHostBuilder(args).Build().RunAsync();
+                var host = CreateHostBuilder(args).Build();
+                await host.RunAsync();
                 return 0;
             }
             catch (Exception ex)
@@ -37,10 +38,16 @@ namespace DVConsole
             Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddTransient<ITestInterface, TestService>();
-                    services.AddHostedService<WorkerService>();
+                    services
+                        .AddHostedService<DataverseConsoleExample01>()
+                        .Configure<DataVerseOptions>
+                            (hostContext.Configuration.GetSection("Dataverse"))
+                        //.UseDataVerse(ServiceCollectionExtensions.DataverseConnectionMode.UserLogin)
+                        .UseDataVerse(ServiceCollectionExtensions.DataverseConnectionMode.ClientSecret)
+                        ;
                 })
                 .UseSerilog()
-                .UseConsoleLifetime();
+                .UseConsoleLifetime()
+            ;
     }
 }

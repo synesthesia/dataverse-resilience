@@ -1,21 +1,22 @@
-﻿using DVConsole.Services;
+﻿
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.PowerPlatform.Dataverse.Client;
 
 namespace DVConsole.HostedServices;
 
-internal class WorkerService : IHostedService
+internal class DataverseConsoleExample01 : IHostedService
 {
-    private readonly ITestInterface _testService;
+    private readonly ServiceClient _xrmService;
     private readonly IHostApplicationLifetime _hostApplicationLifetime;
     private readonly ILogger _logger;
 
-    public WorkerService(
-        ITestInterface testService,
+    public DataverseConsoleExample01(
+        ServiceClient xrmService,
         IHostApplicationLifetime hostApplicationLifetime,
-        ILogger<WorkerService> logger)
+        ILogger<DataverseConsoleExample01> logger)
     {
-        _testService = testService;
+        _xrmService = xrmService;
         _hostApplicationLifetime = hostApplicationLifetime;
         _logger = logger;
     }
@@ -24,9 +25,12 @@ internal class WorkerService : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Worker.StartAsync()");
-        _testService.Foo();
-        _logger.LogCritical("Calling host to end application");
 
+        // do some work here
+        _logger.LogInformation("Dataverse ServiceClient.IsReady: {0}", _xrmService.IsReady);
+
+        
+        _logger.LogCritical("Calling host to end application");
         _hostApplicationLifetime.StopApplication();
         return Task.CompletedTask;
     }
