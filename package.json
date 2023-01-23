@@ -1,0 +1,25 @@
+{
+  "name": "dataverse-resilience",
+  "version": "1.0.0",
+  "description": "Experiments with resilience for apps that call Microsoft Dataverse",
+  "main": "",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/synesthesia/dataverse-resilience.git"
+  },
+  "author": "Julian Elve",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/synesthesia/dataverse-resilience/issues"
+  },
+  "homepage": "https://github.com/synesthesia/dataverse-resilience#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^17.4.2",
+    "@commitlint/config-conventional": "^17.4.2",
+    "husky": "^8.0.3"
+  }
+}
