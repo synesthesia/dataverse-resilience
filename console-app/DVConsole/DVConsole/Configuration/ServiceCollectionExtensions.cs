@@ -116,47 +116,50 @@ namespace DVConsole.Configuration
                 return app;
             });
 
-                
+
 
             services.AddHttpClient<IDataverseClient, DataverseClient>(
-                (sp, client )=>
-                {
-                    var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
-                    var config = options.Value;
-
-                    // Set the base address of the named client.
-                    client.BaseAddress = new Uri(config.InstanceUrl + "/api/data/v9.2/");
-
-                    var headers = client.DefaultRequestHeaders;
-                    
-                    // Add a user-agent default request header.
-                    headers.UserAgent.ParseAdd("dotnet-docs");
-
-                    headers.Add("OData-MaxVersion", "4.0");
-                    headers.Add("OData-Version", "4.0");
-                    headers.Accept.Add(
-                        new MediaTypeWithQualityHeaderValue("application/json"));
-                    
-                })
-                .ConfigurePrimaryHttpMessageHandler(() =>
-                    new HttpClientHandler
+                    (sp, client) =>
                     {
-                        // remove affinity cookie for performance
-                        UseCookies = false
-                    }
-                );
+                        var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
+                        var config = options.Value;
+
+                        // Set the base address of the named client.
+                        client.BaseAddress = new Uri(config.InstanceUrl + "/api/data/v9.2/");
+
+                        var headers = client.DefaultRequestHeaders;
+
+                        // Add a user-agent default request header.
+                        headers.UserAgent.ParseAdd("dotnet-docs");
+
+                        headers.Add("OData-MaxVersion", "4.0");
+                        headers.Add("OData-Version", "4.0");
+                        headers.Accept.Add(
+                            new MediaTypeWithQualityHeaderValue("application/json"));
+
+                    })
+                .ConfigureHttpMessageHandlerBuilder(builder =>
+                {
+                    builder.PrimaryHandler = builder.Services.GetRequiredService<OAuthMessageHandler>();
+                    
+                });
+
+            services.AddSingleton<OAuthMessageHandler>(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
+                var config = options.Value;
+
+                var handler = new OAuthMessageHandler(
+                    config.InstanceUrl,
+                    config.ClientId,
+                    config.ClientSecret,
+                    config.TenantId,
+                    new HttpClientHandler() {UseCookies = false});
+                
+                return handler;
+            });
 
             return services;
-        }
-
-
-    }
-
-    public class HttpClientFactory : IMsalHttpClientFactory
-    {
-        public HttpClient GetHttpClient()
-        {
-            throw new NotImplementedException();
         }
     }
 }
