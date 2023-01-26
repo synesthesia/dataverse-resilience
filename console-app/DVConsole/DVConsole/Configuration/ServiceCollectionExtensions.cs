@@ -1,6 +1,9 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Net.Http.Headers;
+using DVConsole.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Identity.Client;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 
@@ -93,6 +96,67 @@ namespace DVConsole.Configuration
 
             return services;
         }
-        
+
+        public static IServiceCollection UseDataVerseHttpClient(
+            this IServiceCollection services)
+        {
+
+            services.AddSingleton<IConfidentialClientApplication>(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
+                var config = options.Value;
+
+
+                var app = ConfidentialClientApplicationBuilder
+                    .Create(config.ClientId)
+                    .WithClientSecret(config.ClientSecret)
+                    .WithAuthority(AzureCloudInstance.AzurePublic, config.TenantId)
+                    .Build();
+                
+                return app;
+            });
+
+                
+
+            services.AddHttpClient<IDataverseClient, DataverseClient>(
+                (sp, client )=>
+                {
+                    var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
+                    var config = options.Value;
+
+                    // Set the base address of the named client.
+                    client.BaseAddress = new Uri(config.InstanceUrl + "/api/data/v9.2/");
+
+                    var headers = client.DefaultRequestHeaders;
+                    
+                    // Add a user-agent default request header.
+                    headers.UserAgent.ParseAdd("dotnet-docs");
+
+                    headers.Add("OData-MaxVersion", "4.0");
+                    headers.Add("OData-Version", "4.0");
+                    headers.Accept.Add(
+                        new MediaTypeWithQualityHeaderValue("application/json"));
+                    
+                })
+                .ConfigurePrimaryHttpMessageHandler(() =>
+                    new HttpClientHandler
+                    {
+                        // remove affinity cookie for performance
+                        UseCookies = false
+                    }
+                );
+
+            return services;
+        }
+
+
+    }
+
+    public class HttpClientFactory : IMsalHttpClientFactory
+    {
+        public HttpClient GetHttpClient()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

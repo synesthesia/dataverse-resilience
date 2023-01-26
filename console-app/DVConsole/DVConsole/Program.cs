@@ -39,11 +39,10 @@ namespace DVConsole
                 .ConfigureServices((hostContext, services) =>
                 {
                     services
-                        .AddHostedService<DataverseConsoleExample02>()
                         .Configure<DataVerseOptions>
                             (hostContext.Configuration.GetSection("Dataverse"))
-                        //.UseDataVerse(ServiceCollectionExtensions.DataverseConnectionMode.UserLogin)
-                        .UseDataVerse(ServiceCollectionExtensions.DataverseConnectionMode.ClientSecret)
+                        .UseDataVerseHttpClient()
+                        .AddHostedService<DataverseConsoleExample03>()
                         ;
                 })
                 .UseSerilog()
