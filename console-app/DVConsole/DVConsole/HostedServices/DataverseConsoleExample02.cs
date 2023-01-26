@@ -2,19 +2,20 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.Rest;
 using Microsoft.Xrm.Sdk;
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 
 namespace DVConsole.HostedServices;
 
-internal class DataverseConsoleExample01 : IHostedService
+internal class DataverseConsoleExample02 : IHostedService
 {
     private readonly ServiceClient _xrmService;
     private readonly IHostApplicationLifetime _hostApplicationLifetime;
     private readonly ILogger _logger;
 
-    public DataverseConsoleExample01(
+    public DataverseConsoleExample02(
         ServiceClient xrmService,
         IHostApplicationLifetime hostApplicationLifetime,
         ILogger<DataverseConsoleExample01> logger)
@@ -33,12 +34,12 @@ internal class DataverseConsoleExample01 : IHostedService
 
         _logger.LogInformation("Dataverse ServiceClient.IsReady: {0}", _xrmService.IsReady);
         _logger.LogInformation("Dataverse recommended max parallelism : {0}", _xrmService.RecommendedDegreesOfParallelism);
-
+        
         OptimiseConnectionSettings();
 
         var startTime = DateTime.UtcNow;
         
-        CreateAndDeleteAccounts(1000);
+        await CreateAndDeleteAccounts(1000);
         
         var secondsForRun = (DateTime.Now - startTime).TotalSeconds;
 
@@ -49,8 +50,11 @@ internal class DataverseConsoleExample01 : IHostedService
         _hostApplicationLifetime.StopApplication();
     }
 
-    private static void OptimiseConnectionSettings()
+    private void OptimiseConnectionSettings()
     {
+        //Disable affinity cookie - this is a cookie that is used to route requests to the same server in a web farm
+        _xrmService.EnableAffinityCookie = false;
+
         //Change max connections from .NET to a remote service default: 2
         System.Net.ServicePointManager.DefaultConnectionLimit = 65000;
         //Bump up the min threads reserved for this app to ramp connections faster - minWorkerThreads defaults to 4, minIOCP defaults to 4
@@ -61,8 +65,8 @@ internal class DataverseConsoleExample01 : IHostedService
         System.Net.ServicePointManager.UseNagleAlgorithm = false;
     }
 
-    // see https://learn.microsoft.com/en-us/power-apps/developer/data-platform/xrm-tooling/sample-tpl-crmserviceclient
-    private void CreateAndDeleteAccounts(int numberOfAccounts)
+    // see https://learn.microsoft.com/en-us/power-apps/developer/data-platform/send-parallel-requests?tabs=sdk
+    private async Task CreateAndDeleteAccounts(int numberOfAccounts)
     {
         var accountsToCreate = new List<Entity>();
         var count = 0;
@@ -76,28 +80,46 @@ internal class DataverseConsoleExample01 : IHostedService
             count++;
         }
 
+        var createdIds = new ConcurrentBag<Guid>();
+
         try
         {
-            _logger.LogInformation($"Creating {accountsToCreate.Count} accounts");
+            _logger.LogInformation($"Creating and deleting {accountsToCreate.Count} accounts");
 
             var startCreate = DateTime.Now;
 
-            //Import the list of accounts
-            var createdAccounts = CreateEntities(accountsToCreate);
+            var parallelOptions = new ParallelOptions()
+            {
+                MaxDegreeOfParallelism =
+                    _xrmService.RecommendedDegreesOfParallelism
+            };
+
+            await Parallel.ForEachAsync(
+                source: accountsToCreate,
+                parallelOptions: parallelOptions,
+                async (entity, token) =>
+                {
+                    createdIds.Add(await _xrmService.CreateAsync(entity, token));
+                });
 
             var secondsToCreate = (DateTime.Now - startCreate).TotalSeconds;
 
             _logger.LogInformation($"Created {accountsToCreate.Count} accounts in  {Math.Round(secondsToCreate)} seconds.");
 
-            _logger.LogInformation($"Deleting {createdAccounts.Count} accounts");
+            _logger.LogInformation($"Deleting {createdIds.Count} accounts");
             var startDelete = DateTime.Now;
 
-            //Delete the list of accounts created
-            DeleteEntities(createdAccounts.ToList());
+            await Parallel.ForEachAsync(
+                source: createdIds,
+                parallelOptions: parallelOptions,
+                async (id, token) =>
+                {
+                    await _xrmService.DeleteAsync("account", id, token);
+                });
 
             var secondsToDelete = (DateTime.Now - startDelete).TotalSeconds;
 
-            _logger.LogInformation($"Deleted {createdAccounts.Count} accounts in {Math.Round(secondsToDelete)} seconds.");
+            _logger.LogInformation($"Deleted {createdIds.Count} accounts in {Math.Round(secondsToDelete)} seconds.");
 
         }
         catch (AggregateException ae)
@@ -109,61 +131,6 @@ internal class DataverseConsoleExample01 : IHostedService
             }
         }
 
-    }
-
-    private ConcurrentBag<EntityReference> CreateEntities(List<Entity> entities)
-    {
-        var createdEntityReferences = new ConcurrentBag<EntityReference>();
-
-        Parallel.ForEach(entities,
-            new ParallelOptions() { MaxDegreeOfParallelism = _xrmService.RecommendedDegreesOfParallelism },
-            () => _xrmService.Clone(), //Clone the ServiceClient for each thread
-            (entity, loopState, index, threadLocalSvc) =>
-            {
-                // In each thread, create entities and add them to the ConcurrentBag
-                // as EntityReferences
-                createdEntityReferences.Add(
-                    new EntityReference(
-                        entity.LogicalName,
-                        threadLocalSvc.Create(entity)
-                    )
-                );
-
-                return threadLocalSvc;
-            },
-            (threadLocalSvc) =>
-            {
-                //Dispose the cloned ServiceClient instance
-                if (threadLocalSvc != null)
-                {
-                    threadLocalSvc.Dispose();
-                }
-            });
-
-        //Return the ConcurrentBag of EntityReferences
-        return createdEntityReferences;
-    }
-
-    private void DeleteEntities(List<EntityReference> entityReferences)
-    {
-        Parallel.ForEach(entityReferences,
-            new ParallelOptions() { MaxDegreeOfParallelism = _xrmService.RecommendedDegreesOfParallelism },
-            () => _xrmService.Clone(), //Clone the ServiceClient for each thread
-            (er, loopState, index, threadLocalSvc) =>
-            {
-                // In each thread, delete the entities
-                threadLocalSvc.Delete(er.LogicalName, er.Id);
-
-                return threadLocalSvc;
-            },
-            (threadLocalSvc) =>
-            {
-                //Dispose the cloned CrmServiceClient instance
-                if (threadLocalSvc != null)
-                {
-                    threadLocalSvc.Dispose();
-                }
-            });
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

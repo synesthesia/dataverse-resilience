@@ -39,7 +39,7 @@ namespace DVConsole
                 .ConfigureServices((hostContext, services) =>
                 {
                     services
-                        .AddHostedService<DataverseConsoleExample01>()
+                        .AddHostedService<DataverseConsoleExample02>()
                         .Configure<DataVerseOptions>
                             (hostContext.Configuration.GetSection("Dataverse"))
                         //.UseDataVerse(ServiceCollectionExtensions.DataverseConnectionMode.UserLogin)
