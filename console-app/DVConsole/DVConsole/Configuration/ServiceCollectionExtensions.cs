@@ -108,21 +108,6 @@ namespace DVConsole.Configuration
             this IServiceCollection services)
         {
 
-            services.AddSingleton<IConfidentialClientApplication>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
-                var config = options.Value;
-
-
-                var app = ConfidentialClientApplicationBuilder
-                    .Create(config.ClientId)
-                    .WithClientSecret(config.ClientSecret)
-                    .WithAuthority(AzureCloudInstance.AzurePublic, config.TenantId)
-                    .Build();
-                
-                return app;
-            });
-
             services.AddHttpClient<IDataverseClient, DataverseClient>(
                     (sp, client) =>
                     {
@@ -149,22 +134,6 @@ namespace DVConsole.Configuration
                     
                 });
 
-
-            services.AddSingleton<IConfidentialClientApplication>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
-                var config = options.Value;
-                
-                var authProvider = ConfidentialClientApplicationBuilder
-                    .Create(config.ClientId)
-                    .WithClientSecret(config.ClientSecret)
-                    .WithAuthority(AzureCloudInstance.AzurePublic, config.TenantId)
-                    .Build();
-
-                return authProvider;
-            });
-
-            
             services.AddTransient<OAuthMessageHandler>(sp =>
             {
                 var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
@@ -183,6 +152,20 @@ namespace DVConsole.Configuration
                     new HttpClientHandler() {UseCookies = false});
                 
                 return handler;
+            });
+
+            services.AddSingleton<IConfidentialClientApplication>(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
+                var config = options.Value;
+
+                var authProvider = ConfidentialClientApplicationBuilder
+                    .Create(config.ClientId)
+                    .WithClientSecret(config.ClientSecret)
+                    .WithAuthority(AzureCloudInstance.AzurePublic, config.TenantId)
+                    .Build();
+
+                return authProvider;
             });
 
             return services;

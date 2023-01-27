@@ -36,5 +36,4 @@ public class OAuthMessageHandler : DelegatingHandler
         request.Headers.Authorization = authHeader;
         return base.SendAsync(request, cancellationToken);
     }
-
 }

@@ -3,6 +3,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using System.Collections.Concurrent;
+using System.Dynamic;
+using DVConsole.Model.DTO;
 using DVConsole.Services;
 
 namespace DVConsole.HostedServices;
@@ -12,6 +14,7 @@ internal class DataverseConsoleExample03 : IHostedService
     private readonly IDataverseClient _xrmClient;
     private readonly IHostApplicationLifetime _hostApplicationLifetime;
     private readonly ILogger _logger;
+    private int _recordCounter = 0;
 
     public DataverseConsoleExample03(
         IDataverseClient xrmClient,
@@ -33,16 +36,25 @@ internal class DataverseConsoleExample03 : IHostedService
         OptimiseConnectionSettings();
 
         var startTime = DateTime.UtcNow;
-        
-        await CreateAndDeleteAccounts(1000);
-        
-        var secondsForRun = (DateTime.Now - startTime).TotalSeconds;
 
-        _logger.LogInformation($"Finished in {Math.Round(secondsForRun)} seconds.");
-        
-        _logger.LogCritical("Calling host to end application");
-        
-        _hostApplicationLifetime.StopApplication();
+        try
+        {
+            await CreateAndDeleteAccounts(3000);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in worker");
+        }
+        finally
+        {
+            var secondsForRun = (DateTime.Now - startTime).TotalSeconds;
+            
+            _logger.LogInformation($"Finished in {Math.Round(secondsForRun)} seconds, {_recordCounter} records created.");
+
+            _logger.LogCritical("Calling host to end application");
+
+            _hostApplicationLifetime.StopApplication();
+        }
     }
 
     private void OptimiseConnectionSettings()
@@ -61,14 +73,12 @@ internal class DataverseConsoleExample03 : IHostedService
     // see https://learn.microsoft.com/en-us/power-apps/developer/data-platform/send-parallel-requests?tabs=sdk
     private async Task CreateAndDeleteAccounts(int numberOfAccounts)
     {
-        var accountsToCreate = new List<Entity>();
+        var accountsToCreate = new List<object>();
         var count = 0;
         while (count < numberOfAccounts)
         {
-            var account = new Entity("account")
-            {
-                ["name"] = $"Account {count}"
-            };
+            dynamic account = new ExpandoObject();
+            account.name = $"Account {count}";
             accountsToCreate.Add(account);
             count++;
         }
@@ -85,19 +95,19 @@ internal class DataverseConsoleExample03 : IHostedService
 
             _logger.LogInformation($"UserId: {userId}");
 
-            // var parallelOptions = new ParallelOptions()
-            // {
-            //     MaxDegreeOfParallelism =
-            //         _xrmService.RecommendedDegreesOfParallelism
-            // };
-            //
-            // await Parallel.ForEachAsync(
-            //     source: accountsToCreate,
-            //     parallelOptions: parallelOptions,
-            //     async (entity, token) =>
-            //     {
-            //         createdIds.Add(await _xrmService.CreateAsync(entity, token));
-            //     });
+            var parallelOptions = new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = 12
+            };
+            
+            await Parallel.ForEachAsync(
+                source: accountsToCreate,
+                parallelOptions: parallelOptions,
+                async (entity, token) =>
+                {
+                    createdIds.Add(await _xrmClient.Create("accounts", entity, token));
+                    Interlocked.Increment(ref _recordCounter);
+                });
 
             var secondsToCreate = (DateTime.Now - startCreate).TotalSeconds;
 
@@ -106,13 +116,13 @@ internal class DataverseConsoleExample03 : IHostedService
             _logger.LogInformation($"Deleting {createdIds.Count} accounts");
             var startDelete = DateTime.Now;
 
-            // await Parallel.ForEachAsync(
-            //     source: createdIds,
-            //     parallelOptions: parallelOptions,
-            //     async (id, token) =>
-            //     {
-            //         await _xrmService.DeleteAsync("account", id, token);
-            //     });
+            await Parallel.ForEachAsync(
+                 source: createdIds,
+                 parallelOptions: parallelOptions,
+                 async (id, token) =>
+                 {
+                     await _xrmClient.Delete("accounts", id, token);
+                 });
 
             var secondsToDelete = (DateTime.Now - startDelete).TotalSeconds;
 
