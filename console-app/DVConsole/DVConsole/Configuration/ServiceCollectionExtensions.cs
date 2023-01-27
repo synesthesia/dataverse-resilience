@@ -59,8 +59,8 @@ namespace DVConsole.Configuration
                 return new ServiceClient(connString, logger: logger);
             }
             services.AddSingleton<ServiceClient>(ServiceFactory);
-            services.AddSingleton<IOrganizationService>(sp => sp.GetService<ServiceClient>());
-            services.AddSingleton<IOrganizationServiceAsync2>(sp => sp.GetService<ServiceClient>());
+            services.AddSingleton<IOrganizationService>(ServiceFactory);
+            services.AddSingleton<IOrganizationServiceAsync2>(ServiceFactory);
 
             return services;
         }
@@ -91,8 +91,8 @@ namespace DVConsole.Configuration
                 return new ServiceClient(connString, logger:logger);
             }
             services.AddSingleton<ServiceClient>(ServiceFactory);
-            services.AddSingleton<IOrganizationService>(sp => sp.GetService<ServiceClient>());
-            services.AddSingleton<IOrganizationServiceAsync2>(sp => sp.GetService<ServiceClient>());
+            services.AddSingleton<IOrganizationService>(ServiceFactory);
+            services.AddSingleton<IOrganizationServiceAsync2>(ServiceFactory);
 
             return services;
         }
@@ -164,6 +164,12 @@ namespace DVConsole.Configuration
             {
                 var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
                 var config = options.Value;
+
+                if (config?.InstanceUrl == null)
+                {
+                    throw new InvalidOperationException(
+                        "InstanceUrl is not set in the configuration");
+                }
                 var ap = sp.GetRequiredService<IConfidentialClientApplication>();
 
                 var handler = new OAuthMessageHandler(

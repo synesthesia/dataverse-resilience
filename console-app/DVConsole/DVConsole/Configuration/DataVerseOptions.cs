@@ -2,14 +2,14 @@
 {
     public class DataVerseOptions
     {
-        public string User { get; set; }
-        public string InstanceUrl { get; set; }
+        public string? User { get; set; }
+        public string? InstanceUrl { get; set; }
         
-        public string ClientId { get; set; }
+        public string? ClientId { get; set; }
 
-        public string ClientSecret { get; set; }
+        public string? ClientSecret { get; set; }
 
-        public string TenantId { get; set; }
+        public string? TenantId { get; set; }
         
     }
 }
