@@ -17,6 +17,13 @@ namespace DVConsole.Configuration
             ClientSecret
         }
 
+        /// <summary>
+        /// Configure the App to use Dataverse ServiceClient
+        /// via either client secret or interactive login
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="mode"></param>
+        /// <returns></returns>
         public static IServiceCollection UseDataVerse(
             this IServiceCollection services,
             DataverseConnectionMode mode = DataverseConnectionMode.UserLogin
@@ -31,7 +38,6 @@ namespace DVConsole.Configuration
                     services.UseDataVerseClientSecret();
                     break;
             }
-
             return services;
         }
 
@@ -54,8 +60,6 @@ namespace DVConsole.Configuration
                 RequireNewInstance = false;
                 TokenCacheStorePath = c:\MyTokenCache\msal_cache.data;
                 LoginPrompt = Auto";
-                //RedirectUri = app://{config.ClientId};
-                //RedirectUri = https://login.microsoftonline.com/common/oauth2/nativeclient;
                 return new ServiceClient(connString, logger: logger);
             }
             services.AddSingleton<ServiceClient>(ServiceFactory);
@@ -67,7 +71,6 @@ namespace DVConsole.Configuration
 
         public static IServiceCollection UseDataVerseClientSecret(this IServiceCollection services)
         {
-
             ServiceClient ServiceFactory(IServiceProvider sp)
             {
                 var options = sp.GetRequiredService<IOptions<DataVerseOptions>>();
@@ -86,8 +89,6 @@ namespace DVConsole.Configuration
                 TokenCacheStorePath = c:\MyTokenCache\msal_cache.data;
                 LoginPrompt = Auto";
                 
-                //RedirectUri = app://{config.ClientId};
-                //RedirectUri = https://login.microsoftonline.com/common/oauth2/nativeclient;
                 return new ServiceClient(connString, logger:logger);
             }
             services.AddSingleton<ServiceClient>(ServiceFactory);
@@ -97,6 +98,12 @@ namespace DVConsole.Configuration
             return services;
         }
 
+        /// <summary>
+        /// Configure the app to use HttpClient to access Dataverse
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
         public static IServiceCollection UseDataVerseHttpClient(
             this IServiceCollection services)
         {
@@ -115,8 +122,6 @@ namespace DVConsole.Configuration
                 
                 return app;
             });
-
-
 
             services.AddHttpClient<IDataverseClient, DataverseClient>(
                     (sp, client) =>

@@ -1,13 +1,12 @@
-﻿using System.Net.Http.Headers;
-using DVConsole.Configuration;
-using DVConsole.Model.DTO;
+﻿using DVConsole.Model.DTO;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.Identity.Client;
 using Newtonsoft.Json;
 
 namespace DVConsole.Services;
 
+/// <summary>
+/// <inheritdoc cref="IDataverseClient"/>
+/// </summary>
 public class DataverseClient : IDataverseClient
 {
     private HttpClient _client;
@@ -30,6 +29,4 @@ public class DataverseClient : IDataverseClient
         var whoAmIResponse = JsonConvert.DeserializeObject<WhoAmIResponse>(content);
         return whoAmIResponse?.UserId;
     }
-
-   
 }
