@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
+using Polly;
+using Polly.Extensions.Http;
 
 namespace DVConsole.Configuration
 {
@@ -130,9 +132,43 @@ namespace DVConsole.Configuration
                     })
                 .ConfigureHttpMessageHandlerBuilder(builder =>
                 {
-                    builder.PrimaryHandler = builder.Services.GetRequiredService<OAuthMessageHandler>();
-                    
-                });
+                    builder.PrimaryHandler =
+                        builder.Services.GetRequiredService<OAuthMessageHandler>();
+                })
+                .AddPolicyHandler((s, request) =>
+                    HttpPolicyExtensions.HandleTransientHttpError()
+                        .OrResult(httpResponseMessage => httpResponseMessage.StatusCode ==
+                                                         System.Net.HttpStatusCode.TooManyRequests)
+                        .WaitAndRetryAsync<HttpResponseMessage>(
+                            retryCount: 5,
+                            sleepDurationProvider: (count, response, context) =>
+                            {
+                                int seconds;
+                                var headers = response.Result.Headers;
+                                if (headers.Contains("Retry-After"))
+                                {
+                                    seconds = int.Parse(headers.GetValues("Retry-After")
+                                        .FirstOrDefault());
+                                }
+                                else
+                                {
+                                    seconds = (int) Math.Pow(2, count);
+                                }
+
+                                return TimeSpan.FromSeconds(seconds);
+                            },
+                            onRetryAsync: (outcome, timespan, retryAttempt, context) =>
+                            {
+                                context["RetriesInvoked"] = retryAttempt;
+                                s.GetService<ILogger<DataverseClient>>()?
+                                    .LogWarning("Status {statusCode} - delaying for {delay}ms, then do retry {retry}.",
+                                        outcome.Result.StatusCode,
+                                        timespan.TotalMilliseconds, 
+                                        retryAttempt);
+                                return Task.CompletedTask;
+                            })
+                );
+
 
             services.AddTransient<OAuthMessageHandler>(sp =>
             {
@@ -168,7 +204,44 @@ namespace DVConsole.Configuration
                 return authProvider;
             });
 
+
+            
             return services;
+
+            
+        }
+
+        
+
+        // <summary>
+        /// Specifies the Retry policies
+        /// </summary>
+        /// <param name="config">Configuration data for the service</param>
+        /// <returns></returns>
+        static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy(IOptions<PollyOptions> opts)
+        {
+            return HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .OrResult(httpResponseMessage => httpResponseMessage.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                .WaitAndRetryAsync(
+                    retryCount: opts.Value?.MaxRetries ?? 5,
+                    sleepDurationProvider: (count, response, context) =>
+                    {
+                        int seconds;
+                        var headers = response.Result.Headers;
+
+                        if (headers.Contains("Retry-After"))
+                        {
+                            seconds = int.Parse(headers.GetValues("Retry-After").FirstOrDefault());
+                        }
+                        else
+                        {
+                            seconds = (int)Math.Pow(2, count);
+                        }
+                        return TimeSpan.FromSeconds(seconds);
+                    },
+                    onRetryAsync: (_, _, _, _) => { return Task.CompletedTask; }
+                );
         }
     }
 }

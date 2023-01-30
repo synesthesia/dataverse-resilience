@@ -41,8 +41,10 @@ namespace DVConsole
                     services
                         .Configure<DataVerseOptions>
                             (hostContext.Configuration.GetSection("Dataverse"))
+                        .Configure<PollyOptions>
+                            (hostContext.Configuration.GetSection("Polly"))
                         .UseDataVerseHttpClient()
-                        .AddHostedService<DataverseConsoleExample03>()
+                        .AddHostedService<DataverseConsoleExample04>()
                         ;
                 })
                 .UseSerilog()
